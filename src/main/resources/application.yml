@@ -16,6 +16,11 @@ spring:
 datastax.astra:
   secure-connect-bundle: src/main/resources/secure-connect.zip
 
+datadump:
+  location:
+    author: /Users/akshitkhatri/Documents/github-projects/betterreads-data-loader/test-authors.txt
+    works: /Users/akshitkhatri/Documents/github-projects/betterreads-data-loader/test-works.txt
+
 astra:
   db:
     id: <db-id>
