@@ -22,8 +22,11 @@ import org.springframework.context.annotation.Bean;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.stream.Stream;
 
@@ -69,7 +72,6 @@ public class BetterreadsDataLoaderApplication {
 		System.out.println(authorDumpLocation);
 		initAuthors();
 		initWorks();
-
 	}
 
 	private void initAuthors() {
@@ -107,6 +109,7 @@ public class BetterreadsDataLoaderApplication {
 		Path path = Paths.get(worksDumpLocation);
 		ObjectMapper objectMapper = new ObjectMapper();
 		List<Book> books = new ArrayList<>();
+		DateTimeFormatter dateFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.SSSSSS");
 		try (Stream<String> lines = Files.lines(path)) {
 			lines.forEach(line -> {
 				// Read and parse line
@@ -120,14 +123,43 @@ public class BetterreadsDataLoaderApplication {
 
 				// Construct Book Object
 				Book book = new Book();
+				book.setId(jsonNode.get("key").asText().replace("/works/",""));
 				book.setName(jsonNode.get("title").asText());
 				JsonNode description = jsonNode.get("description");
 				if (null != description) {
 					book.setDescription(description.get("value").asText());
 				}
+				JsonNode publishedDate = jsonNode.get("created");
+				if (null != publishedDate) {
+					book.setPublishedDate(LocalDate.parse(publishedDate.get("value").asText(), dateFormatter));
+				}
+				JsonNode covers = jsonNode.path("covers");
+				if (null != covers) {
+					List<String> coverIds = new ArrayList<>();
+					for (JsonNode cover : covers) {
+						coverIds.add(cover.asText());
+					}
+					book.setCoverIds(coverIds);
+				}
+				JsonNode authors = jsonNode.path("authors");
+				if (null != authors) {
+					List<String> authorIds = new ArrayList<>();
+					for (JsonNode author : authors) {
+						authorIds.add(author.get("author").get("key").asText()
+								.replace("/authors/",""));
+					}
+					book.setAuthorIds(authorIds);
+					List<String> authorNames = authorIds.stream()
+							.map(authorId -> authorRepository.findById(authorId))
+							.map(optionalAuthor -> {
+								if (optionalAuthor.isEmpty()) return "Unknown Author";
+								return optionalAuthor.get().getName();
+							}).toList();
+					book.setAuthorNames(authorNames);
+				}
 
-
-
+				// Persist in Repository
+				books.add(book);
 			});
 			bookRepository.saveAll(books);
 		} catch (Exception e) {
