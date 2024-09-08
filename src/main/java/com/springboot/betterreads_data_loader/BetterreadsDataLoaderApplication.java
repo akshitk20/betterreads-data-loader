@@ -6,8 +6,10 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.util.JSONPObject;
 import com.springboot.betterreads_data_loader.model.author.Author;
+import com.springboot.betterreads_data_loader.model.book.Book;
 import com.springboot.betterreads_data_loader.properties.DatastaxAstraProperties;
 import com.springboot.betterreads_data_loader.repository.author.AuthorRepository;
+import com.springboot.betterreads_data_loader.repository.book.BookRepository;
 import jakarta.annotation.PostConstruct;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -33,6 +35,9 @@ public class BetterreadsDataLoaderApplication {
 
 	@Autowired
 	private AuthorRepository authorRepository;
+
+	@Autowired
+	private BookRepository bookRepository;
 
 	@Value("${datadump.location.author}")
 	private String authorDumpLocation;
@@ -63,6 +68,7 @@ public class BetterreadsDataLoaderApplication {
 		System.out.println("Application started");
 		System.out.println(authorDumpLocation);
 		initAuthors();
+		initWorks();
 
 	}
 
@@ -98,6 +104,34 @@ public class BetterreadsDataLoaderApplication {
 	}
 
 	private void initWorks() {
+		Path path = Paths.get(worksDumpLocation);
+		ObjectMapper objectMapper = new ObjectMapper();
+		List<Book> books = new ArrayList<>();
+		try (Stream<String> lines = Files.lines(path)) {
+			lines.forEach(line -> {
+				// Read and parse line
+				String jsonString = line.substring(line.indexOf("{"));
+				JsonNode jsonNode = null;
+				try {
+					jsonNode = objectMapper.readTree(jsonString);
+				} catch (JsonProcessingException e) {
+					throw new RuntimeException(e);
+				}
 
+				// Construct Book Object
+				Book book = new Book();
+				book.setName(jsonNode.get("title").asText());
+				JsonNode description = jsonNode.get("description");
+				if (null != description) {
+					book.setDescription(description.get("value").asText());
+				}
+
+
+
+			});
+			bookRepository.saveAll(books);
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
 	}
 }
